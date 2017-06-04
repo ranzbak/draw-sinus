@@ -8,7 +8,7 @@ BasicUpstart2(begin)      // <- This creates a basic sys line that can start you
 xpix:  .word $0000   // X position to draw the pixel to
 ypix:  .byte $00     // Y position to draw the pixel to
 anoff: .byte $00     // Animation offset
-pixrm: .fill 20, 0   // List of bytes to remove
+pixrm: .fill 100, 0  // List of bytes to remove
 pixcn: .byte 0			 // Array counter
 
 //drawaddr: .word $2000 // Address to draw to
@@ -160,6 +160,13 @@ irq1:
   lda #$ff // Acknowledge interrupt
   sta	$d019
 
+// Clear the last run
+	jsr clearpixels
+
+// Debug
+	lda #2
+	sta $d020
+
 // Draw some pixels
 	lda #$00
 	sta xpix + 1
@@ -185,7 +192,7 @@ irq1:
 	clc
 	adc #$08
 	inx
-	cpx #12
+	cpx #19
 	bne !-
 
   // Trigger at raster line 200
@@ -284,7 +291,45 @@ drawpixel:
 
 	sta drawaddr:$FFFF			// Just put the pixel clearing the other 7 pixels *LAZY*
 
+	// store the location in the erase arrey
+	ldx pixcn								// Get the pixel counter
+	lda drawaddr						// Get the draw addr low byte
+	sta pixrm, x						// Store low byte
+	inx
+	lda drawaddr+1					// High byte
+	sta pixrm, x
+	inx
+	stx pixcn								// store rm pix counter
+
 	rts											// done
+
+////
+// Clear pixels
+clearpixels:
+	ldx #00									
+	
+	cpx pixcn								// Ignore first run
+	bne !+
+	rts
+!:
+	lda pixrm, x						// Retrieve low byte
+	sta clearaddr1
+	inx
+	lda pixrm, x
+	sta clearaddr1+1				// retrieve high byte
+	inx
+
+	lda #0
+	sta clearaddr1:$FFFF		// Clear display byte
+	cpx pixcn
+	bne !-									
+
+	lda #$00
+	sta pixcn								// Reset the pixelcounter
+
+rts
+	
+	
 
 ////
 // Clear the display memory
