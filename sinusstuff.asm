@@ -5,13 +5,13 @@ BasicUpstart2(begin)      // <- This creates a basic sys line that can start you
 //*************************************************
 
 // Vars
-xpix:  .word $0000   // X position to draw the pixel to
-ypix:  .byte $00     // Y position to draw the pixel to
-anoff: .byte $00     // Animation offset
-pixrm: .fill 100, 0  // List of bytes to remove
-pixcn: .byte 0			 // Array counter
-
-//drawaddr: .word $2000 // Address to draw to
+xpix:    .word $0000   // X position to draw the pixel to
+ypix:    .byte $00     // Y position to draw the pixel to
+anoff:   .byte $00     // Animation offset
+piroffx:  .byte $00			// Period offset
+piroffy:  .byte $22			// Period offset
+pixrm:   .fill 100, 0  // List of bytes to remove
+pixcn:   .byte 0			  // Array counter
 
 // Zero page
 
@@ -31,10 +31,10 @@ pixcn: .byte 0			 // Array counter
 // Sinus lookup table
 .var i=0
 .var len=256
-sinus:
+sintab:
 .while (i++<len) {
-  .var x = round(200-(50*sin((i*2*PI)/(len))))
-  .print x
+  .var x = round(100-(90*sin((i*2*PI)/(len))))
+  .print "" + i + " value: " + x
   .byte x 
 }
 
@@ -154,49 +154,62 @@ irq1:
   pha
 
 // Debug
-	lda #1
+	lda #1								// To White
 	sta $d020
 
-  lda #$ff // Acknowledge interrupt
+  lda #$ff							// Acknowledge interrupt
   sta	$d019
 
 // Clear the last run
 	jsr clearpixels
 
 // Debug
-	lda #2
+	lda #2								// To brown
 	sta $d020
 
 // Draw some pixels
 	lda #$00
 	sta xpix + 1
 
-	lda #$07
-	and anoff
+	lda #$07						// Mask lower 3 bits, to animate 0-7
+	and anoff					  // Pixel offset
 	inc anoff
 	ldx #$00
+	inc piroffx					// change period
+	inc piroffy					// change period
+	inc piroffy					// change period
 !:
-	sta xpix
+	pha
+	adc piroffy					// Y progression
+	tay
+	lda sintab,y				// Sinus X lookup
+	sta xpix						// Set X draw coordinate
+
+	pla
+	pha									// Store the counter
+	
+	adc piroffx					// period offset sinus wave X
+	tay									// Lookup Y from sinus table
+	lda sintab,	y
 	sta ypix
 
-	pha
-	txa
+	txa									// Store the X register
 	pha
 
-	jsr drawpixel
+	jsr drawpixel				// Draw the pixel that 
 
-	pla
+	pla									// Restore the X
 	tax
-	pla
+	pla									// Restore A
 
 	clc
-	adc #$08
+	adc #$10
 	inx
-	cpx #19
+	cpx #$10
 	bne !-
 
   // Trigger at raster line 200
-  ldy #255
+  ldy #240
   sty $d012
 
 	// Debug
@@ -230,7 +243,6 @@ raster_init:
   sta INTSTATREG
   sta INTVICCONTREG
   rts
-
 
 
 //// 
