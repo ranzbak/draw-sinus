@@ -8,10 +8,10 @@ BasicUpstart2(begin)      // <- This creates a basic sys line that can start you
 xpix:    .word $0000   // X position to draw the pixel to
 ypix:    .byte $00     // Y position to draw the pixel to
 anoff:   .byte $00     // Animation offset
-piroffx:  .byte $00			// Period offset
-piroffy:  .byte $22			// Period offset
+piroffx:  .byte $00    // Period offset
+piroffy:  .byte $22    // Period offset
 pixrm:   .fill 100, 0  // List of bytes to remove
-pixcn:   .byte 0			  // Array counter
+pixcn:   .byte 0       // Array counter
 
 // Zero page
 
@@ -34,15 +34,15 @@ pixcn:   .byte 0			  // Array counter
 sintab:
 .while (i++<len) {
   .var x = round(100-(90*sin((i*2*PI)/(len))))
-  .print "" + i + " value: " + x
-  .byte x 
+  //.print "" + i + " value: " + x
+  .byte x
 }
 
 // 8 value mask table
 bitmask:
 .for(var count=0; count<8; count++){
   .byte (128>>count)
-  .print (128>>count)
+  //.print (128>>count)
 }
 
 // Screen memory Y axis lookup table
@@ -71,7 +71,7 @@ begin:
 
   lda #$35             // Bank out kernal and basic
   sta $01              // $e000-$ffff
-  
+
   //
   // Border and frame both black
   lda #$0
@@ -82,15 +82,15 @@ begin:
   //
   // Clear character memory
   ldx #$00
-!clear:  
-  lda #$10     // set foreground to black in Color Ram 
+!clear:
+  lda #$10     // set foreground to black in Color Ram
   sta $0400,x  // fill four areas with 256 spacebar characters
   sta $0500,x
-  sta $0600,x 
-  sta $06e8,x 
+  sta $0600,x
+  sta $06e8,x
   inx           // increment X
   bne !clear-   // did X turn to zero yet?
-  
+
   lda SCRCONTREG       // Put the VIC into bitmap graphics mode
   ora #%00100000       // Enable bitmap mode bit 6
   sta SCRCONTREG
@@ -99,17 +99,17 @@ begin:
   ora #%00001000
   sta MEMSETREG
 
-	// Clear the bitmap
-	jsr clearbitmap
+  // Clear the bitmap
+  jsr clearbitmap
 
-	// Setup the raster interrupt
-	jsr raster_init
+  // Setup the raster interrupt
+  jsr raster_init
 
   // Start teh main routine
-  asl INTSTATREG				// Ack any previous raster interrupt
-  bit $dc0d							// reading the interrupt control registers 
-  bit $dd0d							// clears them
-	cli										// Enable interrupts again
+  asl INTSTATREG        // Ack any previous raster interrupt
+  bit $dc0d             // reading the interrupt control registers
+  bit $dd0d             // clears them
+  cli                   // Enable interrupts again
 
 
 //////
@@ -125,8 +125,8 @@ begin:
 //  inx              // to next byte
 //
 //  bne !+           // Trigger on 255 -> 0 (256)
-//  inc copy1+1    // DEBUG destructive, but good enough for now  
-//  inc copy2+1    // DEBUG destructive, but good enough for now  
+//  inc copy1+1    // DEBUG destructive, but good enough for now
+//  inc copy2+1    // DEBUG destructive, but good enough for now
 //!:
 //
 //  lda #$55         // All bytes to one to display
@@ -141,7 +141,7 @@ begin:
 // Ad infinum
   jmp *
 
-  rts 
+  rts
 
 ////
 // Raster interrupt routine
@@ -154,81 +154,86 @@ irq1:
   pha
 
 // Debug
-	lda #1								// To White
-	sta $d020
+  lda #1                // To White
+  sta $d020
 
-  lda #$ff							// Acknowledge interrupt
-  sta	$d019
+  lda #$ff              // Acknowledge interrupt
+  sta $d019
 
 // Clear the last run
-	jsr clearpixels
+  jsr clearpixels
 
 // Debug
-	lda #2								// To brown
-	sta $d020
+  lda #2                // To brown
+  sta $d020
 
 // Draw some pixels
-	lda #$00
-	sta xpix + 1
+  lda #$00
+  sta xpix + 1
 
-	lda #$07						// Mask lower 3 bits, to animate 0-7
-	and anoff					  // Pixel offset
-	inc anoff
-	ldx #$00
-	inc piroffx					// change period
-	inc piroffy					// change period
-	inc piroffy					// change period
+
+  lda #$07            // Mask lower 3 bits, to animate 0-7
+  and anoff           // Pixel offset
+  inc anoff
+  ldx #$00
+  inc piroffx         // change period
+  inc piroffy         // change period
+  inc piroffy         // change period
 !:
-	pha
-	adc piroffy					// Y progression
-	tay
-	lda sintab,y				// Sinus X lookup
-	sta xpix						// Set X draw coordinate
+  pha
+  adc piroffy         // Y progression
+  tay
+  lda sintab,y        // Sinus X lookup
 
-	pla
-	pha									// Store the counter
-	
-	adc piroffx					// period offset sinus wave X
-	tay									// Lookup Y from sinus table
-	lda sintab,	y
-	sta ypix
+  clc
+  ldy #$00            // Y = 0
+  adc #$32            // move cicle
 
-	txa									// Store the X register
-	pha
+  sta xpix            // Set X draw coordinate
 
-	jsr drawpixel				// Draw the pixel that 
+  pla
+  pha                 // Store the counter
 
-	pla									// Restore the X
-	tax
-	pla									// Restore A
+  adc piroffx         // period offset sinus wave X
+  tay                 // Lookup Y from sinus table
+  lda sintab, y
+  sta ypix
 
-	clc
-	adc #$10
-	inx
-	cpx #$10
-	bne !-
+  txa                 // Store the X register
+  pha
+
+  jsr drawpixel       // Draw the pixel that
+
+  pla                 // Restore the X
+  tax
+  pla                 // Restore A
+
+  clc
+  adc #$10
+  inx
+  cpx #$10
+  bne !-
 
   // Trigger at raster line 200
   ldy #240
   sty $d012
 
-	// Debug
-	lda #0
-	sta $d020
+  // Debug
+  lda #0
+  sta $d020
 
-	// Restore registers
+  // Restore registers
   pla
   tay
   pla
   tax
   pla
 
-	rti
+  rti
 
-  
 ////
 // Initialize Raster interrupt
-raster_init: 
+raster_init:
   lda #$3b //Clear the High bit (lines 256-318)
   sta SCRCONTREG
 
@@ -245,113 +250,113 @@ raster_init:
   rts
 
 
-//// 
+////
 // Write a pixel
-// Store 
+// Store
 // X in xpix word
 // Y in ypix byte
 // touches : X, A, carry
 drawpixel:
-	// Reset self modifying code
-	lda #$00
-	sta drawaddr
-	sta drawyofflo
-	sta drawyoffhi
-	lda #$20
-	sta drawaddr+1
-	lda #$92
-	sta drawyofflo+1
-	sta drawyoffhi+1
+  // Reset self modifying code
+  lda #$00
+  sta drawaddr
+  sta drawyofflo
+  sta drawyoffhi
+  lda #$20
+  sta drawaddr+1
+  lda #$92
+  sta drawyofflo+1
+  sta drawyoffhi+1
 
-	// Get Y offset
-	clc
-	lda ypix							// ypix offset times 2
-	rol 
-	sta drawyofflo
-	sta drawyoffhi
+  // Get Y offset
+  clc
+  lda ypix              // ypix offset times 2
+  rol
+  sta drawyofflo
+  sta drawyoffhi
 
-	bcc !+								// If an overflow occurs, add one to the msb
-	inc drawyofflo+1
-	inc drawyoffhi+1
+  bcc !+                // If an overflow occurs, add one to the msb
+  inc drawyofflo+1
+  inc drawyoffhi+1
 !:
 
-	lda drawyofflo:$FFFF    // Get lower y offset address	
-	sta drawaddr	
+  lda drawyofflo:$FFFF    // Get lower y offset address
+  sta drawaddr
 
-	clc
-	ldx #$01
-	lda drawyoffhi:$FFFF, x // Get the higher offset address
-	sta drawaddr+1
+  clc
+  ldx #$01
+  lda drawyoffhi:$FFFF, x // Get the higher offset address
+  sta drawaddr+1
 
-	// Get the X offset and add it to the drawaddr
-	lda #%11111000					// calculate the lsb offset
-	and xpix								
-	
-	clc											// Store in the drawaddr lsb
-	adc drawaddr
-	sta drawaddr
+  // Get the X offset and add it to the drawaddr
+  lda #%11111000          // calculate the lsb offset
+  and xpix
 
-	lda xpix+1							// Get the X msb, add it to the drawaddr msb + carry
-	adc drawaddr+1
-	sta drawaddr+1				
+  clc                     // Store in the drawaddr lsb
+  adc drawaddr
+  sta drawaddr
 
-	// Or mask byte
-	lda #%00000111
-	and xpix
-	tax
-	lda bitmask, x					// get the correct bitmask 
+  lda xpix+1              // Get the X msb, add it to the drawaddr msb + carry
+  adc drawaddr+1
+  sta drawaddr+1
 
-	sta drawaddr:$FFFF			// Just put the pixel clearing the other 7 pixels *LAZY*
+  // Or mask byte
+  lda #%00000111
+  and xpix
+  tax
+  lda bitmask, x          // get the correct bitmask
 
-	// store the location in the erase arrey
-	ldx pixcn								// Get the pixel counter
-	lda drawaddr						// Get the draw addr low byte
-	sta pixrm, x						// Store low byte
-	inx
-	lda drawaddr+1					// High byte
-	sta pixrm, x
-	inx
-	stx pixcn								// store rm pix counter
+  sta drawaddr:$FFFF      // Just put the pixel clearing the other 7 pixels *LAZY*
 
-	rts											// done
+  // store the location in the erase arrey
+  ldx pixcn               // Get the pixel counter
+  lda drawaddr            // Get the draw addr low byte
+  sta pixrm, x            // Store low byte
+  inx
+  lda drawaddr+1          // High byte
+  sta pixrm, x
+  inx
+  stx pixcn               // store rm pix counter
+
+  rts                     // done
 
 ////
 // Clear pixels
 clearpixels:
-	ldx #00									
-	
-	cpx pixcn								// Ignore first run
-	bne !+
-	rts
+  ldx #00
+
+  cpx pixcn               // Ignore first run
+  bne !+
+  rts
 !:
-	lda pixrm, x						// Retrieve low byte
-	sta clearaddr1
-	inx
-	lda pixrm, x
-	sta clearaddr1+1				// retrieve high byte
-	inx
+  lda pixrm, x            // Retrieve low byte
+  sta clearaddr1
+  inx
+  lda pixrm, x
+  sta clearaddr1+1        // retrieve high byte
+  inx
 
-	lda #0
-	sta clearaddr1:$FFFF		// Clear display byte
-	cpx pixcn
-	bne !-									
+  lda #0
+  sta clearaddr1:$FFFF    // Clear display byte
+  cpx pixcn
+  bne !-
 
-	lda #$00
-	sta pixcn								// Reset the pixelcounter
+  lda #$00
+  sta pixcn               // Reset the pixelcounter
 
 rts
-	
-	
+
+
 
 ////
 // Clear the display memory
 clearbitmap:
   ldx #$00
-	txa
+  txa
 !:
   sta clraddr:$2000, x  // write 0 to display memory
   inx
-  bne !-                  
+  bne !-
 
   inc clraddr+1         // Next segment
   lda #$40
